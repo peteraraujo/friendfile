@@ -4,3 +4,4 @@ friendfile-*.tar
 venv
 .idea
 app.log
+tests/app.log
