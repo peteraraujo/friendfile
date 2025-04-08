@@ -29,9 +29,7 @@
 <header class="card" id="title-bar">
     <h1 class="headline-medium no-select"><a href="{{ url_for('client.serve_client', path='') }}" class="primary-text">FriendFile</a></h1>
     <button class="theme-btn" id="btn-theme" title="Toggle theme" aria-label="Toggle theme"><i class="material-icons" aria-hidden="true">brightness_6</i></button>
-    <div id="loading-bar" class="progress" style="display: none;">
-        <div class="indeterminate"></div>
-    </div>
+
 </header>
 
 <!-- Main Content -->
@@ -253,6 +251,12 @@
 <!-- Snackbar -->
 <div id="snackbar" role="alert" aria-live="polite" aria-atomic="true"></div>
 
+<!--Loading bar-->
+<div id="loading-bar" class="progress" style="display: none;">
+    <div class="indeterminate"></div>
+</div>
+
+<!--Scripts-->
 <script type="text/javascript" src="{{ url_for('static', filename='js/materialize.min.js') }}" defer></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/ToggleTheme.min.js') }}" defer></script>
 <script>
