@@ -42,8 +42,8 @@ const DOM = {
     editAddAddressBtn: document.querySelector('#details-edit .address-container .btn-input-list-add'),
     editNotes: document.getElementById('details-edit-notes'),
     editSaveBtn: document.querySelector('#details-edit .btn-save'),
-    cancelBtn: document.getElementById('btn-cancel'),
-    deleteBtn: document.getElementById('btn-delete'),
+    editCancelBtn: document.getElementById('btn-cancel'),
+    editDeleteBtn: document.getElementById('btn-delete'),
     newFirstName: document.getElementById('details-new-first'),
     newLastName: document.getElementById('details-new-last'),
     newBirthdate: document.getElementById('details-new-birthdate'),
@@ -171,8 +171,8 @@ DOM.editSaveBtn.addEventListener('click', (e) => {
     e.preventDefault();
     saveContact();
 });
-DOM.cancelBtn.addEventListener('click', () => confirmNavigation(() => showViewMode(), currentContactId ? `/${currentContactId}` : ''));
-DOM.deleteBtn.addEventListener('click', () => DOM.deleteDialog.showModal());
+DOM.editCancelBtn.addEventListener('click', () => confirmNavigation(() => showViewMode(), currentContactId ? `/${currentContactId}` : ''));
+DOM.editDeleteBtn.addEventListener('click', () => DOM.deleteDialog.showModal());
 DOM.deleteConfirmBtn.addEventListener('click', () => {
     DOM.deleteDialog.close();
     deleteContact();
@@ -187,7 +187,7 @@ DOM.newSaveBtn.addEventListener('click', (e) => {
 DOM.newCancelBtn.addEventListener('click', () => confirmNavigation(() => {
     DOM.container.classList.remove('active');
     showNoneMode();
-}, ''));
+}, '/'));
 DOM.backBtn.addEventListener('click', () => confirmNavigation(() => {
     DOM.container.classList.remove('active');
     showNoneMode();
