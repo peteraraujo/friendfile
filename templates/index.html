@@ -27,7 +27,7 @@
 <body>
 <!-- Header -->
 <header class="card" id="title-bar">
-    <h1 id="title" class="headline-medium no-select">FriendFile</h1>
+    <h1 class="headline-medium no-select"><a href="{{ url_for('client.serve_client', path='') }}" class="primary-text">FriendFile</a></h1>
     <button class="theme-btn" id="btn-theme" title="Toggle theme" aria-label="Toggle theme"><i class="material-icons" aria-hidden="true">brightness_6</i></button>
     <div id="loading-bar" class="progress" style="display: none;">
         <div class="indeterminate"></div>
