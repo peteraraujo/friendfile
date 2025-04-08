@@ -3,3 +3,4 @@ database.db
 friendfile-*.tar
 venv
 .idea
+app.log
