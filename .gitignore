@@ -1,0 +1,5 @@
+friendfile.iml
+database.db
+friendfile-*.tar
+venv
+.idea

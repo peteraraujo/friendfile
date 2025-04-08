@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<script>
+    function getTheme() {
+        const isDarkModeEnabledViaCss = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const currentTheme = localStorage.getItem('theme');
+        return currentTheme ? currentTheme === 'dark' : isDarkModeEnabledViaCss;
+    }
+
+    function setTheme(enableDark) {
+        document.documentElement.setAttribute('theme', enableDark ? 'dark' : 'light');
+        localStorage.setItem('theme', enableDark ? 'dark' : 'light');
+    }
+
+    const currentState = getTheme();
+    setTheme(currentState);
+</script>
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/materialize.min.css') }}" media="screen,projection"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.min.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <title>FriendFile</title>
+</head>
+<body>
+<!-- Header -->
+<header class="card" id="title-bar">
+    <h1 id="title" class="headline-medium no-select">FriendFile</h1>
+    <button class="theme-btn" id="btn-theme" title="Toggle theme" aria-label="Toggle theme"><i class="material-icons" aria-hidden="true">brightness_6</i></button>
+    <div id="loading-bar" class="progress" style="display: none;">
+        <div class="indeterminate"></div>
+    </div>
+</header>
+
+<!-- Main Content -->
+<main class="container general-container">
+    <!-- Contact List Section -->
+    <section id="list-container" class="card">
+        <header id="list-header" class="card">
+            <h2 id="list-header-title" class="title-large">
+                Contacts
+                <button id="btn-new" class="btn-small rounded outlined waves-effect waves-light" title="Add new contact" aria-label="Add new contact" aria-controls="details-new"><i class="material-icons" aria-hidden="true">add</i></button>
+            </h2>
+            <div class="input-field">
+                <button type="button" class="suffix" id="btn-search" title="Search" aria-label="Search"><i class="material-icons" aria-hidden="true">search</i></button>
+                <input id="search-field" type="text" placeholder="Search contacts" maxlength="50">
+                <label for="search-field">Search</label>
+            </div>
+            <button type="button" class="btn-small label-small" id="btn-sort" title="Sort contacts" aria-label="Sort descending">
+                <span class="sort-text">Asc</span><i aria-hidden="true" class="suffix material-icons">arrow_upward</i>
+            </button>
+            <p class="label-small on-surface-variant-text" id="result-summary">No items to show</p>
+        </header>
+        <ul id="list-content" role="listbox" tabindex="0"></ul>
+        <div id="list-navigation" class="p-2">
+            <button class="btn-small" id="btn-prev" disabled tabindex="0" aria-label="Previous page"><i aria-hidden="true" class="material-icons" title="Previous page">arrow_back</i></button>
+            <ul aria-label="Pagination"></ul>
+            <button class="btn-small" id="btn-next" disabled tabindex="0" aria-label="Next page"><i aria-hidden="true" class="material-icons" title="Next page">arrow_forward</i></button>
+        </div>
+    </section>
+
+    <!-- Details Section -->
+    <section id="details-container" class="card p-3" role="region">
+        <button class="btn outlined rounded waves-effect waves-light" id="btn-back" aria-label="Back to contact list">Back</button>
+        <div class="card-title p-4" id="details-none" role="status" aria-hidden="false">Select a contact to see details</div>
+
+        <!-- View Mode -->
+        <section class="card-content p-4 details-content" id="details-view" role="region" aria-labelledby="details-view-first" aria-hidden="true">
+            <div class="details-content-body">
+                <h2 id="details-view-first" class="card-title"></h2>
+                <p id="details-view-occupation" class="label-medium on-surface-variant-text"></p>
+                <fieldset class="input-list-container email-container">
+                    <legend class="label-medium">Email</legend>
+                    <ul></ul>
+                </fieldset>
+                <fieldset class="input-list-container phone-container">
+                    <legend class="label-medium">Phone</legend>
+                    <ul></ul>
+                </fieldset>
+                <fieldset class="input-list-container address-container">
+                    <legend class="label-medium">Address</legend>
+                    <ul></ul>
+                </fieldset>
+                <fieldset class="input-list-container details-container">
+                    <legend class="label-medium">Details</legend>
+                    <ul></ul>
+                </fieldset>
+            </div>
+            <footer class="details-content-footer">
+                <div class="details-options">
+                    <button type="button" class="btn filled rounded waves-effect waves-light" id="btn-edit" aria-controls="details-edit">Edit</button>
+                </div>
+            </footer>
+        </section>
+
+        <!-- Edit Mode -->
+        <form class="card-content p-4 details-content" id="details-edit" aria-hidden="true">
+            <div class="details-content-body">
+                <h2 class="card-title" id="details-edit-heading">Edit contact</h2>
+                <fieldset class="pt-4 details-section">
+                    <legend class="label-medium">General</legend>
+                    <div class="details-names-container">
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-edit-first" type="text" placeholder="Enter first name" pattern="[A-Za-zà-ü0-9\s\-\.\(\)\+]+" maxlength="50" required>
+                            <label for="details-edit-first" class="active">First Name*</label>
+                            <p class="supporting-text error">Empty or invalid characters</p>
+                            <p class="supporting-text">Required, letters, numbers, and basic punctuation only</p>
+                        </div>
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-edit-first-last" type="text" placeholder="Enter last name" pattern="[A-Za-zà-ü0-9\s\-\.\(\)\+]+" maxlength="50" required>
+                            <label for="details-edit-first-last" class="active">Last Name*</label>
+                            <p class="supporting-text error">Empty or invalid characters</p>
+                            <p class="supporting-text">Required, letters, numbers, and basic punctuation only</p>
+                        </div>
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-edit-birthdate" type="date" placeholder="Enter birthdate" maxlength="10">
+                            <label for="details-edit-birthdate" class="active">Birthdate</label>
+                            <p class="supporting-text error">Invalid date</p>
+                            <p class="supporting-text">Optional, select a valid date</p>
+                        </div>
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-edit-occupation" type="text" placeholder="Enter occupation" pattern="[A-Za-zà-ü0-9\s\-\.\(\)\+]+" maxlength="50">
+                            <label for="details-edit-occupation" class="active">Occupation</label>
+                            <p class="supporting-text error">Invalid characters</p>
+                            <p class="supporting-text">Optional, letters, numbers, and basic punctuation only</p>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset class="input-list-container email-container">
+                    <legend class="label-medium">Email</legend>
+                    <ul></ul>
+                    <button type="button" class="btn btn-input-list-add" title="Add email" aria-label="Add email"><i aria-hidden="true" class="prefix material-icons">add</i>Add email</button>
+                </fieldset>
+                <fieldset class="input-list-container phone-container">
+                    <legend class="label-medium">Phone</legend>
+                    <ul></ul>
+                    <button type="button" class="btn btn-input-list-add" title="Add phone" aria-label="Add phone"><i aria-hidden="true" class="prefix material-icons">add</i>Add phone</button>
+                </fieldset>
+                <fieldset class="input-list-container address-container">
+                    <legend class="label-medium">Address</legend>
+                    <ul></ul>
+                    <button type="button" class="btn btn-input-list-add" title="Add address" aria-label="Add address"><i aria-hidden="true" class="prefix material-icons">add</i>Add address</button>
+                </fieldset>
+                <fieldset class="pt-4 details-section">
+                    <legend class="label-medium">Other</legend>
+                    <div class="input-field outlined details-name-field">
+                        <textarea id="details-edit-notes" class="materialize-textarea" placeholder="Enter notes" maxlength="500"></textarea>
+                        <label for="details-edit-notes" class="active">Notes</label>
+                        <p class="supporting-text error">Invalid characters</p>
+                        <p class="supporting-text">Optional</p>
+                    </div>
+                </fieldset>
+            </div>
+            <footer class="details-content-footer">
+                <div class="details-options" id="details-edit-options">
+                    <button type="button" class="btn filled rounded waves-effect waves-light" id="btn-delete">Delete</button>
+                    <div class="details-options">
+                        <button type="button" class="btn outlined rounded waves-effect waves-light" id="btn-cancel">Cancel</button>
+                        <button type="submit" class="btn filled rounded waves-effect waves-light btn-save">Save</button>
+                    </div>
+                </div>
+            </footer>
+        </form>
+        <!-- New Mode -->
+        <form class="card-content p-4 details-content" id="details-new" aria-hidden="true">
+            <div class="details-content-body">
+                <h2 class="card-title" id="details-new-heading">New contact</h2>
+                <fieldset class="pt-4 details-section">
+                    <legend class="label-medium">General</legend>
+                    <div class="details-names-container">
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-new-first" type="text" placeholder="Enter first name" pattern="[A-Za-zà-ü0-9\s\-\.\(\)\+]+" maxlength="50" required>
+                            <label for="details-new-first" class="active">First Name*</label>
+                            <p class="supporting-text error">Empty or invalid characters</p>
+                            <p class="supporting-text">Required, letters, numbers, and basic punctuation only</p>
+                        </div>
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-new-last" type="text" placeholder="Enter last name" pattern="[A-Za-zà-ü0-9\s\-\.\(\)\+]+" maxlength="50" required>
+                            <label for="details-new-last" class="active">Last Name*</label>
+                            <p class="supporting-text error">Empty or invalid characters</p>
+                            <p class="supporting-text">Required, letters, numbers, and basic punctuation only</p>
+                        </div>
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-new-birthdate" type="date" placeholder="Enter birthdate" maxlength="10">
+                            <label for="details-new-birthdate" class="active">Birthdate</label>
+                            <p class="supporting-text error">Invalid date</p>
+                            <p class="supporting-text">Optional, select a valid date</p>
+                        </div>
+                        <div class="input-field outlined details-name-field">
+                            <input id="details-new-occupation" type="text" placeholder="Enter occupation" pattern="[A-Za-zà-ü0-9\s\-\.\(\)\+]+" maxlength="50">
+                            <label for="details-new-occupation" class="active">Occupation</label>
+                            <p class="supporting-text error">Invalid characters</p>
+                            <p class="supporting-text">Optional, letters, numbers, and basic punctuation only</p>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset class="input-list-container email-container">
+                    <legend class="label-medium">Email</legend>
+                    <ul></ul>
+                    <button type="button" class="btn btn-input-list-add" title="Add email" aria-label="Add email"><i aria-hidden="true" class="prefix material-icons">add</i>Add email</button>
+                </fieldset>
+                <fieldset class="input-list-container phone-container">
+                    <legend class="label-medium">Phone</legend>
+                    <ul></ul>
+                    <button type="button" class="btn btn-input-list-add" title="Add phone" aria-label="Add phone"><i aria-hidden="true" class="prefix material-icons">add</i>Add phone</button>
+                </fieldset>
+                <fieldset class="input-list-container address-container">
+                    <legend class="label-medium">Address</legend>
+                    <ul></ul>
+                    <button type="button" class="btn btn-input-list-add" title="Add address" aria-label="Add address"><i aria-hidden="true" class="prefix material-icons">add</i>Add address</button>
+                </fieldset>
+                <fieldset class="pt-4 details-section">
+                    <legend class="label-medium">Other</legend>
+                    <div class="input-field outlined details-name-field">
+                        <textarea class="materialize-textarea" id="details-new-notes" placeholder="Enter notes" maxlength="500"></textarea>
+                        <label for="details-new-notes" class="active">Notes</label>
+                        <p class="supporting-text error">Invalid characters</p>
+                        <p class="supporting-text">Optional</p>
+                    </div>
+                </fieldset>
+            </div>
+            <footer class="details-content-footer">
+                <div class="details-options" id="details-new-options">
+                    <button type="button" class="btn outlined rounded waves-effect waves-light btn-cancel">Cancel</button>
+                    <button type="submit" class="btn filled rounded waves-effect waves-light btn-save">Save</button>
+                </div>
+            </footer>
+        </form>
+    </section>
+</main>
+
+<!-- Dialogs -->
+<dialog id="delete-confirm" class="card">
+    <h2 id="delete-confirm-title" class="card-title">Confirm deletion</h2>
+    <p>Are you sure you want to delete this contact?</p>
+    <div class="dialog-actions" id="delete-dialog-options">
+        <button class="btn outlined rounded waves-effect" id="delete-cancel" tabindex="0">Cancel</button>
+        <button class="btn filled rounded waves-effect" id="btn-confirm-delete" tabindex="0">Delete</button>
+    </div>
+</dialog>
+
+<dialog id="unsaved-changes-dialog" class="card">
+    <h2 class="card-title">Unsaved Changes</h2>
+    <p>Are you sure you want to leave? Changes will be lost.</p>
+    <div class="dialog-actions">
+        <button class="btn outlined rounded waves-effect" id="unsaved-cancel">Cancel</button>
+        <button class="btn filled rounded waves-effect" id="unsaved-confirm">Leave</button>
+    </div>
+</dialog>
+
+<!-- Snackbar -->
+<div id="snackbar" role="alert" aria-live="polite" aria-atomic="true"></div>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/materialize.min.js') }}" defer></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/ToggleTheme.min.js') }}" defer></script>
+<script>
+    window.API_BASE_PATH = "{{ api_base_path }}";
+    window.CLIENT_BASE_PATH = "{{ client_base_path }}";
+</script>
+<script type="module" src="{{ url_for('static', filename='js/index.min.js') }}" defer></script>
+</body>
+</html>
