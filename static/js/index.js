@@ -1,4 +1,4 @@
-import ContactService from './ContactService.js';
+import ContactService from './ContactService.min.js';
 
 // Service Initialization - Sets up the contact service with error messaging
 const service = new ContactService(window.API_BASE_PATH, (message) => showSnackbar(message));
@@ -70,7 +70,10 @@ const DOM = {
 // State
 let currentContactId = null, isDescending = false, pageCount = 10, currentPage = 1, totalPages = 1, totalCount = 0;
 let activeController = null, isFormDirty = false;
+
+// Consts
 const CLIENT_BASE_PATH = window.CLIENT_BASE_PATH;
+const TITLE_BASE = 'FriendFile';
 
 // Initialize - Sets up the app on load and handles browser navigation
 document.addEventListener('DOMContentLoaded', async () => {
@@ -188,6 +191,7 @@ DOM.newCancelBtn.addEventListener('click', () => confirmNavigation(() => {
 DOM.backBtn.addEventListener('click', () => confirmNavigation(() => {
     DOM.container.classList.remove('active');
     showNoneMode();
+    setTitle('home');
 }, ''));
 DOM.btnNew.addEventListener('click', () => confirmNavigation(() => showNewView(), '/new'));
 DOM.btnPrev.addEventListener('click', () => changePage(currentPage - 1));
@@ -281,6 +285,9 @@ async function showContactDetails(id) {
     }
     const contact = response.data;
     currentContactId = id;
+
+    setTitle('view', contact);
+
     DOM.viewName.textContent = `${contact.firstName} ${contact.lastName || ''}`;
     DOM.viewName.setAttribute('aria-label', `${contact.firstName} ${contact.lastName}`);
     if (contact.occupation) {
@@ -636,6 +643,7 @@ function changePage(page) {
 }
 
 function showViewMode() {
+
     DOM.detailsNone.style.display = 'none';
     DOM.detailsNone.setAttribute('aria-hidden', 'true');
     DOM.detailsView.style.display = 'flex';
@@ -646,6 +654,7 @@ function showViewMode() {
     DOM.detailsNew.setAttribute('aria-hidden', 'true');
     DOM.editBtn.setAttribute('tabindex', '0');
     DOM.btnNew.setAttribute('tabindex', '0');
+
 }
 
 async function showEditView() {
@@ -655,6 +664,8 @@ async function showEditView() {
     );
     if (!response) return;
     const contact = response.data;
+
+    setTitle('edit', contact);
 
     destroyDropdownInstances(DOM.editPhoneList);
     destroyDropdownInstances(DOM.editAddressList);
@@ -912,11 +923,14 @@ function updateUrl(path, query = '') {
     const normalizedPath = `${CLIENT_BASE_PATH}${path}`.replace(/\/+$/, ''); // Remove trailing slashes
     const newUrl = query ? `${normalizedPath}?${query}` : normalizedPath;
     window.history.pushState({}, document.title, newUrl);
+    setPageTitle(path, query);
 }
 
 async function parseInitialUrl() {
     const path = window.location.pathname.replace(CLIENT_BASE_PATH, '');
     const query = new URLSearchParams(window.location.search);
+
+    setPageTitle(path, window.location.search);
 
     if (path === '' || path === '/') {
         if (query.has('search')) {
@@ -938,6 +952,40 @@ async function parseInitialUrl() {
     } else {
         showNoneMode();
         showSnackbar('Invalid URL path');
+    }
+}
+
+function setTitle(viewMode, contact = null, isSearch = false) {
+    if (isSearch) {
+        document.title = `Search - ${TITLE_BASE}`;
+    } else if (viewMode === 'new') {
+        document.title = `New - ${TITLE_BASE}`;
+    } else if (viewMode === 'view' || viewMode === 'edit') {
+        if (contact && contact.firstName && contact.lastName) {
+            document.title = `${contact.firstName} ${contact.lastName} - ${TITLE_BASE}`;
+        } else if (DOM.viewName.textContent && viewMode === 'view') {
+            document.title = `${DOM.viewName.textContent} - ${TITLE_BASE}`;
+        } else if (DOM.editFirstName.value && DOM.editLastName.value && viewMode === 'edit') {
+            document.title = `${DOM.editFirstName.value.trim()} ${DOM.editLastName.value.trim()} - ${TITLE_BASE}`;
+        } else {
+            document.title = TITLE_BASE;  // Fallback if no contact data
+        }
+    } else {
+        document.title = TITLE_BASE;  // Home or not found
+    }
+}
+
+function setPageTitle(path, query = '') {
+    const isSearch = query && query.includes('search=');
+    if (path === '' || path === '/') {
+        setTitle('home', null, isSearch);
+    } else if (path === '/new') {
+        setTitle('new');
+    } else if (/^\/\d+$/.test(path)) {
+        // Defer to showContactDetails or showEditView for contact name
+        setTitle(DOM.detailsEdit.style.display === 'flex' ? 'edit' : 'view');
+    } else {
+        setTitle('notfound');
     }
 }
 
