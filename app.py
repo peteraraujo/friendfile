@@ -1,3 +1,4 @@
+from collections import defaultdict
 from flask import Flask, jsonify, request, render_template, Blueprint
 from waitress import serve
 from werkzeug.exceptions import BadRequest
@@ -9,6 +10,7 @@ import json
 import re
 import logging
 from logging.handlers import RotatingFileHandler
+from fuzzywuzzy import fuzz
 
 # Configuration
 DEBUG = True if os.getenv('DEBUG', 'True').lower() == 'true' else False
@@ -35,32 +37,52 @@ handler = RotatingFileHandler(log_path, maxBytes=10000, backupCount=3)
 handler.setLevel(logging.DEBUG if DEBUG else logging.INFO)
 app.logger.addHandler(handler)
 
+
 # Database Initialization
 def init_db():
     with sqlite3.connect(app.config['DB_PATH']) as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute('''
-            CREATE TABLE IF NOT EXISTS contacts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                firstName TEXT NOT NULL,
-                lastName TEXT NOT NULL,
-                emails TEXT,
-                phoneNumbers TEXT,
-                addresses TEXT,
-                birthdate TEXT,
-                occupation TEXT,
-                notes TEXT
-            )
-        ''')
+                    CREATE TABLE IF NOT EXISTS contacts
+                    (
+                        id
+                        INTEGER
+                        PRIMARY
+                        KEY
+                        AUTOINCREMENT,
+                        firstName
+                        TEXT
+                        NOT
+                        NULL,
+                        lastName
+                        TEXT
+                        NOT
+                        NULL,
+                        emails
+                        TEXT,
+                        phoneNumbers
+                        TEXT,
+                        addresses
+                        TEXT,
+                        birthdate
+                        TEXT,
+                        occupation
+                        TEXT,
+                        notes
+                        TEXT
+                    )
+                    ''')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_name ON contacts (lastName, firstName)')
         conn.commit()
+
 
 # Database Connection
 def get_db():
     conn = sqlite3.connect(app.config['DB_PATH'])
     conn.row_factory = sqlite3.Row
     return conn
+
 
 def db_call(func):
     @wraps(func)
@@ -79,13 +101,16 @@ def db_call(func):
             return jsonify({"status": "error", "message": "Internal server error"}), 500
         finally:
             conn.close()
+
     return wrapper
+
 
 # Validation and Sanitization
 def sanitize_string(value, max_length):
     cleaned = re.sub(r'<[^>]+>|[\(\)\'\';]', '', value)
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned[:max_length] if cleaned else ''
+
 
 def validate_birthdate(birthdate):
     if not birthdate:
@@ -96,14 +121,24 @@ def validate_birthdate(birthdate):
     except ValueError:
         raise ValueError("Invalid birthdate")
 
+
 def validate_email(email):
-    return re.match(r'''^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$''', email) is not None
+    return re.match(
+        r'''^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$''',
+        email) is not None
+
 
 def validate_phone_number(phone):
-    return isinstance(phone, dict) and 'type' in phone and 'number' in phone and isinstance(phone['type'], str) and isinstance(phone['number'], str)
+    return isinstance(phone, dict) and 'type' in phone and 'number' in phone and isinstance(phone['type'],
+                                                                                            str) and isinstance(
+        phone['number'], str)
+
 
 def validate_address(address):
-    return isinstance(address, dict) and 'type' in address and 'address' in address and isinstance(address['type'], str) and isinstance(address['address'], str)
+    return isinstance(address, dict) and 'type' in address and 'address' in address and isinstance(address['type'],
+                                                                                                   str) and isinstance(
+        address['address'], str)
+
 
 def row_to_contact(row):
     try:
@@ -122,12 +157,71 @@ def row_to_contact(row):
         app.logger.error(f"JSON decode error for row {row['id']}: {e}")
         return None
 
+
+# Search
+def build_inverted_index(contacts):
+    index = defaultdict(list)
+
+    for i, contact in (enumerate(contacts)):
+        # Create token for relevant fields
+        text = f"{contact['firstName']} {contact['lastName']} {contact.get('notes', '')} {contact.get('occupation', '')}".lower()
+        tokens = re.split(r'\s+', text.strip())
+
+        for token in set(tokens):
+            index[token].append(i)
+    return index
+
+
+def search_contacts(query, contacts, index):
+    if not query.strip():
+        return contacts
+
+    query = query.lower().strip()
+
+    terms = re.split(r"\s+", query)
+
+    matched_ids = set()
+
+    # Fuzzy matching for each term
+    for term in terms:
+        for i, contact in enumerate(contacts):
+            text = f"{contact['firstName']} {contact['lastName']} {contact.get('notes', '')} {contact.get('occupation', '')}".lower()
+            tokens = re.split(r'\s+', text.strip())
+
+            # Check fuzzy match
+            if any(fuzz.ratio(term, token) > 80 for token in tokens):
+                matched_ids.add(i)
+
+            # Check inverted index for exact or near matches
+            if term in index:
+                matched_ids.update(index[term])
+
+    # Get match results
+    results = [contacts[i] for i in matched_ids]
+
+    # Rank results (TF-IDF-like scoring)
+    ranked = sorted(
+        results,
+        key=lambda c: (
+            # Weight firstName and lastName higher
+                (query in c['firstName'].lower() or query in c['lastName'].lower()) * 2 +
+                (query in c.get('notes', '').lower()) * 1 +
+                (query in c.get('occupation', '').lower()) * 1 +
+                # Boost for fuzzy match quality
+                max(fuzz.ratio(query, c['firstName'].lower()), fuzz.ratio(query, c['lastName'].lower())) * 0.01
+        ),
+        reverse=True
+    )
+    return ranked
+
+
 # Client Routes
 @client_bp.route('/', defaults={'path': ''}, strict_slashes=False)
 @client_bp.route('/<path:path>', strict_slashes=False)
 def serve_client(path):
     # Serve index.html for all paths under CLIENT_BASE_PATH, passing both base paths
     return render_template('index.html', client_base_path=CLIENT_BASE_PATH, api_base_path=API_BASE_PATH)
+
 
 # API Routes
 @api_bp.route('/contacts', methods=['GET'])
@@ -138,20 +232,28 @@ def get_contacts(cur):
     query = sanitize_string(request.args.get('query', '').lower(), 50)
     desc_order = request.args.get('descOrder', 'false').lower() == 'true'
 
-    where_clause = "WHERE firstName LIKE ? OR lastName LIKE ?" if query else ""
-    order_by = "ORDER BY lastName DESC, firstName DESC" if desc_order else "ORDER BY lastName, firstName"
-    params = [f"%{query}%", f"%{query}%"] if query else []
-
-    cur.execute(f"SELECT COUNT(*) as total FROM contacts {where_clause}", params)
-    total = cur.fetchone()['total']
-
-    offset = (page - 1) * page_count
-    cur.execute(f"SELECT * FROM contacts {where_clause} {order_by} LIMIT ? OFFSET ?", params + [page_count, offset])
+    # Fetch all contacts from SQLite
+    cur.execute("SELECT * FROM contacts")
     contacts = [row_to_contact(row) for row in cur.fetchall() if row_to_contact(row)]
+
+    # Build inverted index and search
+    index = build_inverted_index(contacts)
+    results = search_contacts(query, contacts, index)
+
+    # Apply pagination
+    total = len(results)
+    offset = (page - 1) * page_count
+    paginated_results = results[offset:offset + page_count]
+
+    # Apply sorting (if needed, after ranking)
+    if desc_order:
+        paginated_results.sort(key=lambda c: (c['lastName'], c['firstName']), reverse=True)
+    else:
+        paginated_results.sort(key=lambda c: (c['lastName'], c['firstName']))
 
     return jsonify({
         "status": "success",
-        "data": contacts,
+        "data": paginated_results,
         "meta": {
             "total": total,
             "page": page,
@@ -159,6 +261,7 @@ def get_contacts(cur):
             "totalPages": (total + page_count - 1) // page_count
         }
     })
+
 
 @api_bp.route('/contacts/<int:id>', methods=['GET'])
 @db_call
@@ -172,12 +275,14 @@ def get_contact(cur, id):
         return jsonify({"status": "error", "message": "Invalid contact data"}), 500
     return jsonify({"status": "success", "data": contact})
 
+
 @api_bp.route('/contacts', methods=['POST'])
 @db_call
 def create_contact(cur):
     try:
         data = request.get_json()
-        if not data or 'firstName' not in data or not data['firstName'].strip() or 'lastName' not in data or not data['lastName'].strip():
+        if not data or 'firstName' not in data or not data['firstName'].strip() or 'lastName' not in data or not data[
+            'lastName'].strip():
             raise ValueError("First and last name are required")
 
         first_name = sanitize_string(data['firstName'].strip(), 50)
@@ -197,9 +302,11 @@ def create_contact(cur):
             raise ValueError("Invalid addresses")
 
         cur.execute("""
-            INSERT INTO contacts (firstName, lastName, emails, phoneNumbers, addresses, birthdate, occupation, notes) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (first_name, last_name, json.dumps(emails), json.dumps(phone_numbers), json.dumps(addresses), birthdate, occupation, notes))
+                    INSERT INTO contacts (firstName, lastName, emails, phoneNumbers, addresses, birthdate, occupation,
+                                          notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (first_name, last_name, json.dumps(emails), json.dumps(phone_numbers), json.dumps(addresses),
+                          birthdate, occupation, notes))
         new_id = cur.lastrowid
         contact = {
             "id": new_id, "firstName": first_name, "lastName": last_name, "emails": emails,
@@ -213,12 +320,14 @@ def create_contact(cur):
         app.logger.error(f"Unexpected error: {e}")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
+
 @api_bp.route('/contacts/<int:id>', methods=['PUT'])
 @db_call
 def update_contact(cur, id):
     try:
         data = request.get_json()
-        if not data or 'firstName' not in data or not data['firstName'].strip() or 'lastName' not in data or not data['lastName'].strip():
+        if not data or 'firstName' not in data or not data['firstName'].strip() or 'lastName' not in data or not data[
+            'lastName'].strip():
             raise ValueError("First and last name are required")
 
         first_name = sanitize_string(data['firstName'].strip(), 50)
@@ -242,10 +351,18 @@ def update_contact(cur, id):
             return jsonify({"status": "error", "message": "Contact not found"}), 404
 
         cur.execute("""
-            UPDATE contacts 
-            SET firstName = ?, lastName = ?, emails = ?, phoneNumbers = ?, addresses = ?, birthdate = ?, occupation = ?, notes = ? 
-            WHERE id = ?
-        """, (first_name, last_name, json.dumps(emails), json.dumps(phone_numbers), json.dumps(addresses), birthdate, occupation, notes, id))
+                    UPDATE contacts
+                    SET firstName    = ?,
+                        lastName     = ?,
+                        emails       = ?,
+                        phoneNumbers = ?,
+                        addresses    = ?,
+                        birthdate    = ?,
+                        occupation   = ?,
+                        notes        = ?
+                    WHERE id = ?
+                    """, (first_name, last_name, json.dumps(emails), json.dumps(phone_numbers), json.dumps(addresses),
+                          birthdate, occupation, notes, id))
         contact = {
             "id": id, "firstName": first_name, "lastName": last_name, "emails": emails,
             "phoneNumbers": phone_numbers, "addresses": addresses, "birthdate": birthdate,
@@ -258,6 +375,7 @@ def update_contact(cur, id):
         app.logger.error(f"Unexpected error: {e}")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
+
 @api_bp.route('/contacts/<int:id>', methods=['DELETE'])
 @db_call
 def delete_contact(cur, id):
@@ -265,6 +383,7 @@ def delete_contact(cur, id):
     if cur.rowcount == 0:
         return jsonify({"status": "error", "message": "Contact not found"}), 404
     return '', 204
+
 
 # Register Blueprints
 app.register_blueprint(client_bp)
